@@ -1,0 +1,16 @@
+{
+  "name": "crete",
+  "version": "1.0.0",
+  "description": "Typescript Data Structures and Utils You Might Need",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  },
+  "repository": "https://github.com/FeezyHendrix/crete.git",
+  "author": "AbdulHafeez AbdulRaheem <switchdevelop1@gmail.com>",
+  "license": "MIT"
+}
