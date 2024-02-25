@@ -1,55 +1,55 @@
 export class AsyncSemaphore {
-  private _available: number;
-  private _upcoming: Function[];
-  private _heads: Function[];
+  private available: number;
+  private upcoming: Function[];
+  private heads: Function[];
 
-  private _completeFn!: () => void;
-  private _completePr!: Promise<void>;
+  private completeFn!: () => void;
+  private completePr!: Promise<void>;
 
   constructor(public readonly workersCount: number) {
     if (workersCount <= 0) throw new Error("workersCount must be positive");
-    this._available = workersCount;
-    this._upcoming = [];
-    this._heads = [];
-    this._refreshComplete();
+    this.available = workersCount;
+    this.upcoming = [];
+    this.heads = [];
+    this.refreshComplete();
   }
 
   async withLock<A>(f: () => Promise<A>): Promise<A> {
-    await this._acquire();
-    return this._execWithRelease(f);
+    await this.acquire();
+    return this.execWithRelease(f);
   }
 
   async withLockRunAndForget<A>(f: () => Promise<A>): Promise<void> {
-    await this._acquire();
+    await this.acquire();
     // Ignoring returned promise on purpose!
-    this._execWithRelease(f);
+    this.execWithRelease(f);
   }
 
   async awaitTerminate(): Promise<void> {
-    if (this._available < this.workersCount) {
-      return this._completePr;
+    if (this.available < this.workersCount) {
+      return this.completePr;
     }
   }
 
-  private async _execWithRelease<A>(f: () => Promise<A>): Promise<A> {
+  private async execWithRelease<A>(f: () => Promise<A>): Promise<A> {
     try {
       return await f();
     } finally {
-      this._release();
+      this.release();
     }
   }
 
-  private _queue(): Function[] {
-    if (!this._heads.length) {
-      this._heads = this._upcoming.reverse();
-      this._upcoming = [];
+  private queue(): Function[] {
+    if (!this.heads.length) {
+      this.heads = this.upcoming.reverse();
+      this.upcoming = [];
     }
-    return this._heads;
+    return this.heads;
   }
 
-  private _acquire(): void | Promise<void> {
-    if (this._available > 0) {
-      this._available -= 1;
+  private acquire(): void | Promise<void> {
+    if (this.available > 0) {
+      this.available -= 1;
       return undefined;
     } else {
       let fn: Function = () => {
@@ -58,34 +58,34 @@ export class AsyncSemaphore {
       const p = new Promise<void>((ref) => {
         fn = ref;
       });
-      this._upcoming.push(fn);
+      this.upcoming.push(fn);
       return p;
     }
   }
 
-  private _release(): void {
-    const queue = this._queue();
+  private release(): void {
+    const queue = this.queue();
     if (queue.length) {
       const fn = queue.pop();
       if (fn) fn();
     } else {
-      this._available += 1;
+      this.available += 1;
 
-      if (this._available >= this.workersCount) {
-        const fn = this._completeFn;
-        this._refreshComplete();
+      if (this.available >= this.workersCount) {
+        const fn = this.completeFn;
+        this.refreshComplete();
         fn();
       }
     }
   }
 
-  private _refreshComplete(): void {
+  private refreshComplete(): void {
     let fn: () => void = () => {
       /***/
     };
-    this._completePr = new Promise<void>((r) => {
+    this.completePr = new Promise<void>((r) => {
       fn = r;
     });
-    this._completeFn = fn;
+    this.completeFn = fn;
   }
 }

@@ -1,13 +1,12 @@
-// A simple worker pool implementation
 const taskSymbol = Symbol("task");
 
 export class WorkerPool {
-  private _threadNum: number = 0;
-  private _workers: Worker[] = [];
-  private _busyWorkers: Worker[] = [];
-  private _idleWorkers: Worker[] = [];
-  private _queue: { task: any; cb: Function }[] = [];
-  private _workerPath: string = "";
+  private threadNum: number = 0;
+  private workers: Worker[] = [];
+  private busyWorkers: Worker[] = [];
+  private idleWorkers: Worker[] = [];
+  private queue: { task: any; cb: Function }[] = [];
+  private workerPath: string = "";
 
   /**
    * @param {number} threadNum
@@ -15,27 +14,27 @@ export class WorkerPool {
    * @description Creates a new worker pool
    */
   constructor(threadNum: number, workerPath: string = "worker.js") {
-    this._threadNum = threadNum;
-    this._workerPath = workerPath;
-    this._init();
+    this.threadNum = threadNum;
+    this.workerPath = workerPath;
+    this.init();
   }
 
   /**
    * @description Initializes the worker pool
    * @returns {void}
    */
-  private _init(): void {
-    let threads = this._threadNum;
-    while (--threads >= 0) this._createWorker();
+  private init(): void {
+    let threads = this.threadNum;
+    while (--threads >= 0) this.createWorker();
   }
 
   /**
    * @description Attempts to remove and run a task from the queue
    * @returns {void}
    */
-  private _dequeue(): void {
-    if (!this._queue.length || !this._idleWorkers.length) return;
-    const { task, cb } = this._queue.shift()!;
+  private dequeue(): void {
+    if (!this.queue.length || !this.idleWorkers.length) return;
+    const { task, cb } = this.queue.shift()!;
     this.run(task, cb);
   }
 
@@ -43,27 +42,27 @@ export class WorkerPool {
    * @description Creates a new worker and adds it to the pool
    * @returns {void}
    */
-  private _createWorker(): void {
-    const worker: any = new Worker(this._workerPath);
+  private createWorker(): void {
+    const worker: any = new Worker(this.workerPath);
     worker.onmessage = (event: MessageEvent) => {
       worker[taskSymbol](null, event);
       worker[taskSymbol] = null;
-      this._busyWorkers.splice(this._busyWorkers.indexOf(worker), 1);
-      this._idleWorkers.push(worker);
-      this._clear();
-      this._dequeue();
+      this.busyWorkers.splice(this.busyWorkers.indexOf(worker), 1);
+      this.idleWorkers.push(worker);
+      this.clear();
+      this.dequeue();
     };
     worker.onerror = (error: ErrorEvent) => {
       worker[taskSymbol](error, null);
-      this._workers.splice(this._workers.indexOf(worker), 1);
-      this._busyWorkers.splice(this._busyWorkers.indexOf(worker), 1);
-      this._createWorker();
-      this._clear();
-      this._dequeue();
+      this.workers.splice(this.workers.indexOf(worker), 1);
+      this.busyWorkers.splice(this.busyWorkers.indexOf(worker), 1);
+      this.createWorker();
+      this.clear();
+      this.dequeue();
     };
-    this._workers.push(worker);
-    this._idleWorkers.push(worker);
-    this._dequeue();
+    this.workers.push(worker);
+    this.idleWorkers.push(worker);
+    this.dequeue();
   }
 
   /**
@@ -73,14 +72,14 @@ export class WorkerPool {
    * @returns {void}
    */
   public run(task: any, cb: Function): void {
-    if (!this._workers.length) this._init();
-    if (!this._idleWorkers.length) {
-      this._queue.push({ task, cb });
+    if (!this.workers.length) this.init();
+    if (!this.idleWorkers.length) {
+      this.queue.push({ task, cb });
       return;
     }
-    const worker: any = this._idleWorkers.shift()!;
+    const worker: any = this.idleWorkers.shift()!;
     worker[taskSymbol] = cb;
-    this._busyWorkers.push(worker);
+    this.busyWorkers.push(worker);
     worker.postMessage(task);
   }
 
@@ -88,13 +87,13 @@ export class WorkerPool {
    * @description Attempts to restore the worker pool to its initial state
    * @returns {void}
    */
-  private _clear(): void {
-    if (this._idleWorkers.length !== this._threadNum) return;
-    while (this._workers.length) {
-      const worker = this._workers.shift();
+  private clear(): void {
+    if (this.idleWorkers.length !== this.threadNum) return;
+    while (this.workers.length) {
+      const worker = this.workers.shift();
       worker!.terminate();
     }
-    this._busyWorkers = [];
-    this._idleWorkers = [];
+    this.busyWorkers = [];
+    this.idleWorkers = [];
   }
 }
