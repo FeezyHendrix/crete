@@ -1,4 +1,4 @@
-type Callback<A> = (a: A) => void;
+type Callback<Z> = (a: Z) => void;
 
 export function yieldRunLoop(): Promise<void> {
   const fn: (cb: () => void) => void = typeof setImmediate !== "undefined" ? setImmediate : (cb) => setTimeout(cb, 0);

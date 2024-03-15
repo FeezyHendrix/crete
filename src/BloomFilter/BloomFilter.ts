@@ -23,7 +23,7 @@ export class BloomFilter {
         return false;
       }
     }
-    return true; // Possible false positive
+    return true; 
   }
 
   private getHash(item: string, seed: number): number {
@@ -35,9 +35,3 @@ export class BloomFilter {
     return hash;
   }
 }
-
-// Usage
-const bloomFilter = new BloomFilter(256, 4);
-bloomFilter.add("hello");
-console.log(bloomFilter.contains("hello")); // true
-console.log(bloomFilter.contains("world")); // false (possibly)

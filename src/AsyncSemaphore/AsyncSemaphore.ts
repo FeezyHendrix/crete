@@ -1,7 +1,7 @@
-export class AsyncSemaphore {
+class AsyncSemaphore {
   private available: number;
-  private upcoming: Function[];
-  private heads: Function[];
+  private upcoming: Array<{ resolve: () => void; reject: (reason?: any) => void }> = [];
+  private heads: Array<{ resolve: () => void; reject: (reason?: any) => void }> = [];
 
   private completeFn!: () => void;
   private completePr!: Promise<void>;
@@ -9,26 +9,39 @@ export class AsyncSemaphore {
   constructor(public readonly workersCount: number) {
     if (workersCount <= 0) throw new Error("workersCount must be positive");
     this.available = workersCount;
-    this.upcoming = [];
-    this.heads = [];
     this.refreshComplete();
   }
 
   async withLock<A>(f: () => Promise<A>): Promise<A> {
     await this.acquire();
-    return this.execWithRelease(f);
+    return this.execWithRelease(f).catch((err) => {
+      console.error('Error during withLock execution:', err);
+      throw err;
+    });
   }
 
   async withLockRunAndForget<A>(f: () => Promise<A>): Promise<void> {
     await this.acquire();
-    // Ignoring returned promise on purpose!
-    this.execWithRelease(f);
+    this.execWithRelease(f).catch(err => console.error('Error during withLockRunAndForget execution:', err));
   }
 
-  async awaitTerminate(): Promise<void> {
+  async awaitTerminate(timeoutMs?: number): Promise<void> {
     if (this.available < this.workersCount) {
+      if (timeoutMs !== undefined) {
+        return Promise.race([
+          this.completePr,
+          new Promise<void>((_, reject) => setTimeout(() => reject(new Error('awaitTerminate timed out')), timeoutMs))
+        ]);
+      }
       return this.completePr;
     }
+  }
+
+  drainQueue(): void {
+    this.upcoming.forEach(({ reject }) => reject(new Error('Operation canceled due to drainQueue')));
+    this.heads.forEach(({ reject }) => reject(new Error('Operation canceled due to drainQueue')));
+    this.upcoming = [];
+    this.heads = [];
   }
 
   private async execWithRelease<A>(f: () => Promise<A>): Promise<A> {
@@ -39,9 +52,9 @@ export class AsyncSemaphore {
     }
   }
 
-  private queue(): Function[] {
+  private queue(): Array<{ resolve: () => void; reject: (reason?: any) => void }> {
     if (!this.heads.length) {
-      this.heads = this.upcoming.reverse();
+      this.heads = [...this.upcoming].reverse();
       this.upcoming = [];
     }
     return this.heads;
@@ -50,15 +63,11 @@ export class AsyncSemaphore {
   private acquire(): void | Promise<void> {
     if (this.available > 0) {
       this.available -= 1;
-      return undefined;
+      return;
     } else {
-      let fn: Function = () => {
-        /***/
-      };
-      const p = new Promise<void>((ref) => {
-        fn = ref;
+      const p = new Promise<void>((resolve, reject) => {
+        this.upcoming.push({ resolve, reject });
       });
-      this.upcoming.push(fn);
       return p;
     }
   }
@@ -66,8 +75,8 @@ export class AsyncSemaphore {
   private release(): void {
     const queue = this.queue();
     if (queue.length) {
-      const fn = queue.pop();
-      if (fn) fn();
+      const { resolve } = queue.pop()!;
+      resolve();
     } else {
       this.available += 1;
 
@@ -80,12 +89,8 @@ export class AsyncSemaphore {
   }
 
   private refreshComplete(): void {
-    let fn: () => void = () => {
-      /***/
-    };
-    this.completePr = new Promise<void>((r) => {
-      fn = r;
+    this.completePr = new Promise<void>((resolve) => {
+      this.completeFn = resolve;
     });
-    this.completeFn = fn;
   }
 }
