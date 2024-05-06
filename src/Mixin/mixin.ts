@@ -13,7 +13,7 @@ export function Mixin(result: any, source: any, overwrite: boolean = true) {
     }
 
     const descriptor = Object.getOwnPropertyDescriptor(source, name);
-    Object.defineProperty(result, name, result);
+    Object.defineProperty(result, name, descriptor);
   }
 
   return result;
